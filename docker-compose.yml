@@ -21,7 +21,7 @@ services:
 
   # 3. The Backend API
   api:
-    build: ./backend
+    image: ghcr.io/DiegoSanBal/cv-saas-backend:latest
     restart: always
     ports:
       - "3001:3000"
@@ -39,7 +39,7 @@ services:
 
   # 4. The PDF Worker
   worker:
-    build: ./worker
+    image: ghcr.io/DiegoSanBal/cv-saas-worker:latest
     restart: always
     environment:
       - REDIS_HOST=redis
@@ -52,7 +52,8 @@ services:
 
   # 5. The Frontend
   frontend:
-    build: ./frontend
+    image: ghcr.io/DiegoSanBal/cv-saas-frontend:latest
+    restart: always
     ports:
       - "3000:3000"
     environment:
@@ -62,6 +63,18 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+  # 6. Watchtower (The Automator)
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Check for new images every 30 seconds
+      - WATCHTOWER_POLL_INTERVAL=30
+      # Only watch images from this repo
+      - WATCHTOWER_SCOPE=cv-saas
+    labels:
+      - "com.centurylinklabs.watchtower.scope=cv-saas"
 
 volumes:
   postgres_data:
