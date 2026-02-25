@@ -8,47 +8,117 @@ const pdfQueue = new Queue('pdf-generation', `redis://${process.env.REDIS_HOST}:
 console.log('Worker waiting for jobs...');
 
 pdfQueue.process('generate', async (job) => {
-  const { name, role } = job.data;
+  const { fullName, jobTitle, email, phone, summary, experience, education, skills } = job.data;
 
   console.log(`------------------------------------------------`);
-  console.log(`🖨️  Starting PDF Generation for ${name}`);
+  console.log(`🖨️  Generating Professional CV for ${fullName}`);
 
   try {
-    // 1. Launch Chromium (We use the flags required for Docker/Alpine)
     const browser = await puppeteer.launch({
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Critical for Docker
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
 
-    // 2. Create HTML Content
+    // Helper to convert newlines to <br> tags
+    const nl2br = (text) => (text || '').replace(/\n/g, '<br/>');
+
+    // Helper to format Experience lines
+    const formatExperience = (text) => {
+      if (!text) return '';
+      return (text || '').split('\n').map(line => {
+        const parts = line.split('|');
+        return `
+          <div class="job-item">
+            <div class="job-header">
+              <strong>${parts[0] || line}</strong>
+              ${parts[1] ? `<span class="job-date">${parts[1]}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
     const htmlContent = `
+      <!DOCTYPE html>
       <html>
-        <body style="font-family: sans-serif; padding: 40px;">
-          <h1 style="color: #333;">Resume</h1>
-          <hr/>
-          <h2>${name}</h2>
-          <p><strong>Role:</strong> ${role}</p>
-          <p>This is a generated CV content.</p>
-        </body>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 40px; }
+          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+          .name { font-size: 28px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+          .title { font-size: 18px; color: #555; margin-top: 5px; font-weight: 600; }
+          .contact-info { margin-top: 10px; font-size: 14px; color: #666; }
+          
+          h2 { font-size: 16px; text-transform: uppercase; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px; color: #222; }
+          
+          .section-content { margin-top: 15px; font-size: 14px; }
+          
+          .job-item { margin-bottom: 15px; }
+          .job-header { display: flex; justify-content: space-between; align-items: baseline; }
+          .job-date { font-style: italic; color: #666; font-size: 13px; }
+          
+          .skills-list { display: flex; flex-wrap: wrap; gap: 10px; }
+          .skill-tag { background: #eee; padding: 5px 10px; border-radius: 4px; font-size: 13px; font-weight: 600; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 class="name">${fullName}</h1>
+          <div class="title">${jobTitle}</div>
+          <div class="contact-info">
+            ${email} | ${phone}
+          </div>
+        </div>
+
+        <section>
+          <h2>Professional Summary</h2>
+          <div class="section-content">
+            ${nl2br(summary)}
+          </div>
+        </section>
+
+        <section>
+          <h2>Experience</h2>
+          <div class="section-content">
+            ${formatExperience(experience)}
+          </div>
+        </section>
+
+        <section>
+          <h2>Education</h2>
+          <div class="section-content">
+            ${nl2br(education)}
+          </div>
+        </section>
+
+        <section>
+          <h2>Skills</h2>
+          <div class="section-content">
+            <div class="skills-list">
+              ${(skills || '').split(',').map(skill => `<span class="skill-tag">${skill.trim()}</span>`).join('')}
+            </div>
+          </div>
+        </section>
+      </body>
       </html>
     `;
 
-    // 3. Load HTML
     await page.setContent(htmlContent);
 
-    // 4. Create filename and path
-    const filename = `cv-${name.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
-    const filePath = path.join('/app/output', filename); // /app/output is our mounted volume
+    const filename = `CV-${fullName.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
+    const filePath = path.join('/app/output', filename);
 
-    // 5. Print to PDF
-    await page.pdf({ path: filePath, format: 'A4' });
+    await page.pdf({ 
+      path: filePath, 
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0.5cm', right: '0.5cm', bottom: '0.5cm', left: '0.5cm' }
+    });
     await browser.close();
 
     console.log(`✅ PDF Saved: ${filename}`);
-    console.log(`------------------------------------------------`);
-    
     return { success: true, filename };
 
   } catch (error) {

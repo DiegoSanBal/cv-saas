@@ -21,7 +21,7 @@ services:
 
   # 3. The Backend API
   api:
-    image: ghcr.io/diegosanbal/cv-saas-backend:latest
+    image: ghcr.io/diegosanbal/cv-saas/backend:latest
     restart: always
     ports:
       - "3001:3000"
@@ -39,7 +39,7 @@ services:
 
   # 4. The PDF Worker
   worker:
-    image: ghcr.io/diegosanbal/cv-saas-worker:latest
+    image: ghcr.io/diegosanbal/cv-saas/worker:latest
     restart: always
     environment:
       - REDIS_HOST=redis
@@ -52,7 +52,7 @@ services:
 
   # 5. The Frontend
   frontend:
-    image: ghcr.io/diegosanbal/cv-saas-frontend:latest
+    image: ghcr.io/diegosanbal/cv-saas/frontend:latest
     restart: always
     ports:
       - "3000:3000"
