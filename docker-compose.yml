@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # 1. The Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: cv_user
+      POSTGRES_PASSWORD: cv_password
+      POSTGRES_DB: cv_db
+    ports:
+      - "5432:5432" # Exposed so you can connect with TablePlus/DBeaver if needed
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. The Cache/Queue
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 3. The Backend API
+  api:
+    build: ./backend
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - PORT=3000
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app # Hot reloading: maps your code to the container
+      - /app/node_modules
+      - ./output:/app/output
+
+  # 4. The PDF Worker
+  worker:
+    build: ./worker
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+      - ./output:/app/output
+
+  # 5. The Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://192.168.100.53:3001
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
