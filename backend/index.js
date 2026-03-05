@@ -29,24 +29,33 @@ app.get('/', (req, res) => {
 
 // New Route: Create CV Job
 app.post('/create-cv', async (req, res) => {
-  const { name, role } = req.body;
+  // 1. Destructure the NEW field names from the request
+  const { fullName, jobTitle, email, phone, summary, experience, education, skills } = req.body;
 
-  //validation
-  if (!name || !role){
-      return res.status(400).json({message: 'Name and Role are required'});
+  // 2. Validation (Check for new names)
+  if (!fullName || !jobTitle) {
+    return res.status(400).json({ message: 'Name and Job Title are required' });
   }
 
-  console.log(`Received request to generate CV for ${name}`);
+  console.log(`Received request to generate CV for ${fullName}`);
 
-  //1. ADd job to the Redis Queue
-  // We pass the data {name, role} to the worker
-  const job = await pdfQueue.add('generate', { name, role });
-
-  //2 Respond to the Frontend immediately (Dont wait for the PDF!)
-  res.json({
-    mmessage: `CV generation started for ${name}! (Job ID: ${job.id})`
+  // 3. Add job to the Redis Queue with ALL the new data
+  const job = await pdfQueue.add('generate', { 
+    fullName, 
+    jobTitle, 
+    email, 
+    phone, 
+    summary, 
+    experience, 
+    education, 
+    skills 
   });
-})
+
+  // 4. Respond to the Frontend
+  res.json({ 
+    message: `CV generation started for ${fullName}! (Job ID: ${job.id})` 
+  });
+});
 
 // Job Creator Route
 app.post('/generate-cv', async (req, res) => {
